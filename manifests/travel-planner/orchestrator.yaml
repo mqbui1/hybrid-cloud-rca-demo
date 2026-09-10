@@ -1,0 +1,83 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orchestrator
+  namespace: travel-planner
+  labels:
+    app: orchestrator
+    component: travel-planner
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: orchestrator
+  template:
+    metadata:
+      labels:
+        app: orchestrator
+        component: travel-planner
+    spec:
+      containers:
+        - name: orchestrator
+          image: travel-planner:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8080
+          env:
+            - name: APP_SERVICE
+              value: "orchestrator"
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: OTEL_SERVICE_NAME
+              value: "orchestrator"
+            - name: SPLUNK_OTEL_AGENT
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://$(SPLUNK_OTEL_AGENT):4317"
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "grpc"
+            - name: OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
+              value: "DELTA"
+            - name: DEPLOYMENT_ENVIRONMENT
+              valueFrom:
+                secretKeyRef:
+                  name: demo-secret
+                  key: env
+            # Agent service URLs
+            - name: FLIGHT_AGENT_URL
+              value: "http://flight-agent.travel-planner.svc.cluster.local:8080"
+            - name: HOTEL_AGENT_URL
+              value: "http://hotel-agent.travel-planner.svc.cluster.local:8080"
+            - name: ACTIVITY_AGENT_URL
+              value: "http://activity-agent.travel-planner.svc.cluster.local:8080"
+            - name: SYNTHESIZER_URL
+              value: "http://synthesizer.travel-planner.svc.cluster.local:8080"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: orchestrator
+  namespace: travel-planner
+spec:
+  selector:
+    app: orchestrator
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+  type: ClusterIP

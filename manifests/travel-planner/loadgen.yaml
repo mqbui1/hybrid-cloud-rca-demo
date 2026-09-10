@@ -1,0 +1,36 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: travel-planner-loadgen
+  namespace: travel-planner
+spec:
+  schedule: "*/2 * * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: loadgen
+              image: curlimages/curl:latest
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  DESTINATIONS='["Paris","Tokyo","Rome","London","Sydney"]'
+                  ORIGINS='["Seattle","New York","Chicago","Boston","Denver"]'
+                  DEST=$(echo $DESTINATIONS | tr ',' '\n' | tr -d '[]"' | shuf | head -1)
+                  ORIG=$(echo $ORIGINS | tr ',' '\n' | tr -d '[]"' | shuf | head -1)
+                  echo "Requesting trip: $ORIG -> $DEST"
+                  curl -sf -X POST http://orchestrator.travel-planner.svc.cluster.local:8080/plan \
+                    -H "Content-Type: application/json" \
+                    -d "{\"origin\": \"$ORIG\", \"destination\": \"$DEST\", \"travellers\": 2}" \
+                    | head -c 500
+              resources:
+                requests:
+                  memory: "32Mi"
+                  cpu: "10m"
+                limits:
+                  memory: "64Mi"
+                  cpu: "50m"

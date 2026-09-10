@@ -1,0 +1,115 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: activity-agent
+  namespace: travel-planner
+  labels:
+    app: activity-agent
+    component: travel-planner
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: activity-agent
+  template:
+    metadata:
+      labels:
+        app: activity-agent
+        component: travel-planner
+    spec:
+      containers:
+        - name: activity-agent
+          image: travel-planner:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8080
+          env:
+            - name: APP_SERVICE
+              value: "activity_agent"
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: OTEL_SERVICE_NAME
+              value: "activity-agent"
+            - name: SPLUNK_OTEL_AGENT
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://$(SPLUNK_OTEL_AGENT):4317"
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "grpc"
+            - name: OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
+              value: "DELTA"
+            - name: DEPLOYMENT_ENVIRONMENT
+              valueFrom:
+                secretKeyRef:
+                  name: demo-secret
+                  key: env
+            - name: LLM_PROVIDER
+              valueFrom:
+                secretKeyRef:
+                  name: llm-secret
+                  key: provider
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: llm-secret
+                  key: api_key
+                  optional: true
+            - name: OPENAI_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: llm-secret
+                  key: base_url
+                  optional: true
+            - name: OPENAI_MODEL
+              valueFrom:
+                secretKeyRef:
+                  name: llm-secret
+                  key: model
+                  optional: true
+            - name: BEDROCK_MODEL_ID
+              valueFrom:
+                secretKeyRef:
+                  name: llm-secret
+                  key: bedrock_model_id
+                  optional: true
+            - name: AWS_DEFAULT_REGION
+              valueFrom:
+                secretKeyRef:
+                  name: llm-secret
+                  key: aws_region
+                  optional: true
+            - name: MOCK_MODE
+              valueFrom:
+                secretKeyRef:
+                  name: llm-secret
+                  key: mock_mode
+                  optional: true
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: activity-agent
+  namespace: travel-planner
+spec:
+  selector:
+    app: activity-agent
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+  type: ClusterIP
