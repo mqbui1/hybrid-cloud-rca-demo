@@ -5,9 +5,10 @@
 # Required env vars:
 #   ACCESS_TOKEN  - Splunk Observability ingest token
 #   REALM         - Splunk realm (e.g. us1)
-#   INSTANCE      - Demo instance name (e.g. fmvisibility-2b93)
+#   INSTANCE      - Demo instance name (e.g. acme-demo-2b93)
 #   HEC_URL       - Splunk HEC endpoint URL (demo Splunk Cloud Platform stack)
 #   HEC_TOKEN     - Splunk HEC token
+#   SPLUNK_PLATFORM_INDEX - optional (default: hybrid-cloud-rca-demo)
 # ============================================================
 
 set -e
@@ -36,7 +37,7 @@ helm upgrade --install splunk-otel-collector \
   --set="environment=${INSTANCE}-demo" \
   --set="splunkPlatform.endpoint=${HEC_URL}" \
   --set="splunkPlatform.token=${HEC_TOKEN}" \
-  --set="splunkPlatform.index=fannie-mae-hybrid-visibility-demo" \
+  --set="splunkPlatform.index=${SPLUNK_PLATFORM_INDEX:-hybrid-cloud-rca-demo}" \
   splunk-otel-collector-chart/splunk-otel-collector
 
 echo "==> Waiting for OTel Collector pods to be ready..."

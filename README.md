@@ -1,49 +1,49 @@
-# Fannie Mae Hybrid Visibility Demo
+# Hybrid Cloud RCA Demo
 
-External lab environment for the Cisco Cloud Control / hybrid-cloud RCA follow-up demo for
-Nimesh (Fannie Mae). Built standalone — not against Fannie Mae's real O11y Cloud org (they don't
-grant API/token access to Splunk engineers, and this needs to be rehearsed/iterated on freely).
+A reusable demo pattern showing how to answer a common enterprise question:
 
-## The use case being demonstrated
-Nimesh's own example: a transaction to FannieMae.com doesn't go directly to AWS — it traverses
-DNS, does a reverse lookup, routes through on-prem infrastructure, then out to AWS and back. When
-something fails along that path (app, network, load balancer, on-prem device, cloud service), he
-wants a single operational view that shows exactly where.
+> "When a transaction moves across on-prem, network, AWS, and multiple cloud services, can I
+> determine exactly where it failed from a single operational view?"
 
-Key ask, in his words: *"When an application transaction moves across on premises, network, AWS,
-and multiple cloud services, can I determine exactly where it failed from a single operational
-view?"* He explicitly does not want a generic Cloud Control product demo, feature tour, or
-dashboard clicking — and does not want assumptions or over-expectations about what the platform
-can/can't do.
+This is not a generic APM product tour — it demonstrates a specific correlation mechanism that
+works with tooling most enterprises already have, without requiring a new synthetic-monitoring
+agent to be installed anywhere.
 
-## Why this isn't built on ThousandEyes
-Fannie Mae doesn't use ThousandEyes, and Nimesh flagged deploying a new agent as a blocker. They
-already run **ExtraHop and SolarWinds**, both pushing data into Splunk Cloud Platform (core) today
-via the SolarWinds Add-on (splunkbase.com/app/3584) and ExtraHop Add-On (splunkbase.com/app/3938).
+## The pattern
 
-## Correlation mechanism: Log Observer Connect
-Fannie Mae already has the prerequisites for this in their real org (US0: Unified Identity, US1:
-Log Observer Connect enabled) — meaning an APM trace/span can pivot directly into Splunk Platform
-log search by host/time, surfacing their existing ExtraHop/SolarWinds data. This demo replicates
-that mechanism in a standalone lab:
-- A demo Splunk Cloud Platform stack + a demo O11y Cloud org, with Log Observer Connect enabled
-  between them
-- Synthetic events pushed via HEC that mirror the SolarWinds/ExtraHop add-on schemas (no real
-  ExtraHop/SolarWinds hardware needed)
-- The travel-planner OTel app (ported from te-o11y-integration) tagged with matching host
-  identifiers so the time/host correlation actually resolves
+Many enterprises already run network/infrastructure monitoring tools (e.g. ExtraHop, SolarWinds,
+ThousandEyes, etc.) that push data into a Splunk platform, but that data isn't natively part of
+an APM trace. The bridge is **Log Observer Connect**: Splunk Observability Cloud lets you pivot
+from an APM trace/span directly into Splunk Platform log search, scoped by host + time window —
+no new agent required, as long as:
+- The org has Unified Identity configured between the Splunk Observability Cloud org and the
+  Splunk Platform stack
+- Log Observer Connect is enabled
 
-## What's reused from te-o11y-integration
-- OTel Collector install script
-- travel-planner app (orchestrator -> flight/hotel/activity agents -> synthesizer)
-- k3d/EC2 deploy pattern
+The demo mechanic:
+**APM trace shows where a transaction failed → one click pivots into the existing
+network/infra monitoring log data for that host/time → root cause confirmed without leaving the
+workflow.**
 
-## What's new here
-- No ThousandEyes Enterprise Agent, no TE test creation — dropped entirely
-- Synthetic ExtraHop/SolarWinds event generator (`synthetic-network-data/`)
-- A new failure scenario matching Nimesh's exact DNS/on-prem/AWS example (none of
-  te-o11y-integration's existing scenarios cover this)
-- Log Observer Connect setup docs (`docs/LOG_OBSERVER_CONNECT_SETUP.md`)
+## What's in this repo
+- `travel-planner/` — a small OTel-instrumented Flask microservices app (orchestrator ->
+  flight/hotel/activity agents -> synthesizer) that stands in for "the customer's transaction."
+- `manifests/travel-planner/` — k3d/Kubernetes manifests to deploy it.
+- `scripts/` — install the Splunk OTel Collector and deploy the app.
+- `docs/PLAN.md` — phased build plan for standing this demo up.
+
+## Customizing for a specific customer/engagement
+This repo is intentionally generic. To adapt it for a real account:
+1. Swap the failure scenario to match their actual transaction path (e.g. DNS/reverse-lookup
+   between on-prem and cloud, a specific network hop, a specific cloud service).
+2. Build a synthetic event generator matching the schema of whatever network/infra monitoring
+   tool they actually use (check their Splunk platform add-ons for the exact event schema).
+3. Tag synthetic events and OTel spans with matching host identifiers/time windows so the Log
+   Observer Connect pivot resolves correctly.
+4. Keep customer names, transcripts, and account-specific planning notes **out of this repo** —
+   track those separately (internal notes, not committed here).
 
 ## Status
-Scaffolding in progress. See `docs/` for setup requirements as they're written.
+Scaffolding in progress — app and OTel Collector deploy scripts are ported and working; infra
+(dedicated stack/org pairing) and the synthetic event generator are not yet built. See
+`docs/PLAN.md`.
