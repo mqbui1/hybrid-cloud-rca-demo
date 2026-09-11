@@ -29,8 +29,12 @@ workflow.**
 - `travel-planner/` — a small OTel-instrumented Flask microservices app (orchestrator ->
   flight/hotel/activity agents -> synthesizer) that stands in for "the customer's transaction."
 - `manifests/travel-planner/` — k3d/Kubernetes manifests to deploy it.
-- `scripts/` — install the Splunk OTel Collector and deploy the app.
+- `scripts/` — install the Splunk OTel Collector, deploy the app, and a worked-example
+  DNS/on-prem-to-cloud failure scenario (`03-inject-dns-failure.sh` / `04-restore-services.sh`).
+- `synthetic-network-data/` — generator that pushes SolarWinds/ExtraHop-shaped events via HEC, to
+  stand in for a customer's existing network-monitoring telemetry without needing real hardware.
 - `docs/PLAN.md` — phased build plan for standing this demo up.
+- `docs/DEMO_SCRIPT.md` — step-by-step walkthrough of the DNS/on-prem-to-cloud scenario.
 
 ## Customizing for a specific customer/engagement
 This repo is intentionally generic. To adapt it for a real account:
@@ -44,6 +48,7 @@ This repo is intentionally generic. To adapt it for a real account:
    track those separately (internal notes, not committed here).
 
 ## Status
-Scaffolding in progress — app and OTel Collector deploy scripts are ported and working; infra
-(dedicated stack/org pairing) and the synthetic event generator are not yet built. See
+App, OTel Collector deploy scripts, the DNS/on-prem failure scenario, and the synthetic event
+generator are built and working. Still open: provisioning the dedicated Splunk Platform +
+Observability Cloud org pairing with Log Observer Connect configured between them — see
 `docs/PLAN.md`.
