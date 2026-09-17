@@ -13,17 +13,20 @@ agent to be installed anywhere.
 
 Many enterprises already run network/infrastructure monitoring tools (e.g. ExtraHop, SolarWinds,
 ThousandEyes, etc.) that push data into a Splunk platform, but that data isn't natively part of
-an APM trace. The bridge is **Log Observer Connect**: Splunk Observability Cloud lets you pivot
-from an APM trace/span directly into Splunk Platform log search, scoped by host + time window —
-no new agent required, as long as:
-- The org has Unified Identity configured between the Splunk Observability Cloud org and the
-  Splunk Platform stack
-- Log Observer Connect is enabled
+an APM trace. The bridge is Splunk Observability Cloud's **Related Content** feature, which
+surfaces logs next to a trace/span — with **Log Observer Connect** as the prerequisite
+integration that makes Splunk Platform logs available to it in the first place. No new agent
+required, as long as:
+- The org has Unified Identity + Log Observer Connect configured between the Observability Cloud
+  org and the Splunk Platform stack
+- Entity-index mapping is enabled for Related Content (logs) on the relevant index
+- The log events and the span/host share a matching correlation field — in practice `host.name`,
+  since standalone network-monitoring events aren't tied to a trace/span ID
 
 The demo mechanic:
-**APM trace shows where a transaction failed → one click pivots into the existing
-network/infra monitoring log data for that host/time → root cause confirmed without leaving the
-workflow.**
+**APM trace shows where a transaction failed → Related Content surfaces existing network/infra
+monitoring log data for that host/time, right next to the trace → root cause confirmed without
+leaving the workflow.**
 
 ## What's in this repo
 - `travel-planner/` — a small OTel-instrumented Flask microservices app (orchestrator ->
@@ -42,8 +45,8 @@ This repo is intentionally generic. To adapt it for a real account:
    between on-prem and cloud, a specific network hop, a specific cloud service).
 2. Build a synthetic event generator matching the schema of whatever network/infra monitoring
    tool they actually use (check their Splunk platform add-ons for the exact event schema).
-3. Tag synthetic events and OTel spans with matching host identifiers/time windows so the Log
-   Observer Connect pivot resolves correctly.
+3. Tag synthetic events with the exact `host.name` value the OTel Collector already stamps on
+   the span (see `docs/DEMO_SCRIPT.md`) so Related Content can resolve the correlation.
 4. Keep customer names, transcripts, and account-specific planning notes **out of this repo** —
    track those separately (internal notes, not committed here).
 

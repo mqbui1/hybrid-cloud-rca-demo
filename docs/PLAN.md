@@ -37,7 +37,9 @@ lab that replicates the same mechanism with synthetic data, decoupled from any s
 1. Provision a dedicated Splunk Platform stack with admin access and open HEC ingestion for
    dev/test.
 2. Provision a dedicated Splunk Observability Cloud org with admin access.
-3. Configure Log Observer Connect between the two.
+3. Configure Log Observer Connect between the two, then enable entity-index mapping for
+   Related Content (logs) on the index being used — Related Content won't surface correlated
+   logs without this, even with Log Observer Connect on and matching host values.
 
 **Phase 2 — Synthetic telemetry**
 4. Build a synthetic network/infra-monitoring event generator that pushes to the Splunk platform
