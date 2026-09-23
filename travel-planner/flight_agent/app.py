@@ -32,6 +32,14 @@ def health():
 
 @app.route("/invoke", methods=["POST"])
 def invoke():
+    if os.environ.get("LB_UNHEALTHY", "false").lower() == "true":
+        # Simulates the load balancer having marked this target unhealthy and
+        # removed it from rotation (e.g. failing health checks) — the process
+        # itself is up, but requests routed to it get a 503, not a
+        # connection-refused/DNS error.
+        logger.warning("flight-agent marked unhealthy by LB — returning 503 (simulated)")
+        return jsonify({"error": "Service Temporarily Unavailable"}), 503
+
     payload = request.get_json(force=True) or {}
     origin = payload.get("origin", "Seattle")
     destination = payload.get("destination", "Paris")

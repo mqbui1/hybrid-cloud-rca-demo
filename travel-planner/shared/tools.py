@@ -57,6 +57,18 @@ def search_activities(destination: str) -> str:
     return f"Signature experiences in {destination.title()}:\n{bullets}"
 
 
+CURRENCIES = {
+    "france": ("EUR", 0.92), "japan": ("JPY", 149.5), "italy": ("EUR", 0.92),
+    "uk": ("GBP", 0.79), "usa": ("USD", 1.0), "australia": ("AUD", 1.52),
+}
+
+
+def get_exchange_rate(destination: str) -> str:
+    data = DESTINATIONS.get(destination.lower(), DESTINATIONS["paris"])
+    currency, rate = CURRENCIES.get(data["country"].lower(), ("EUR", 0.92))
+    return f"Current exchange rate: 1 USD = {rate} {currency} ({data['country']})."
+
+
 def create_llm():
     """
     Create LLM instance based on env configuration.

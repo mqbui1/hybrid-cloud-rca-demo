@@ -23,7 +23,7 @@ import requests
 from flask import Flask, jsonify, request
 from opentelemetry import trace
 from opentelemetry.instrumentation.flask import FlaskInstrumentor
-from opentelemetry.trace import SpanKind, StatusCode
+from opentelemetry.trace import SpanKind, StatusCode, format_trace_id
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +34,7 @@ FlaskInstrumentor().instrument_app(app)
 FLIGHT_AGENT_URL   = os.environ.get("FLIGHT_AGENT_URL",   "http://flight-agent.travel-planner.svc.cluster.local:8080")
 HOTEL_AGENT_URL    = os.environ.get("HOTEL_AGENT_URL",    "http://hotel-agent.travel-planner.svc.cluster.local:8080")
 ACTIVITY_AGENT_URL = os.environ.get("ACTIVITY_AGENT_URL", "http://activity-agent.travel-planner.svc.cluster.local:8080")
+CURRENCY_AGENT_URL = os.environ.get("CURRENCY_AGENT_URL", "http://currency-agent.travel-planner.svc.cluster.local:8080")
 SYNTHESIZER_URL    = os.environ.get("SYNTHESIZER_URL",    "http://synthesizer.travel-planner.svc.cluster.local:8080")
 
 tracer = trace.get_tracer(__name__)
@@ -76,6 +77,7 @@ def plan():
     departure, return_date = _dates_from_now()
 
     with tracer.start_as_current_span("travel.plan", kind=SpanKind.SERVER) as span:
+        trace_id = format_trace_id(span.get_span_context().trace_id)
         span.set_attribute("travel.origin", origin)
         span.set_attribute("travel.destination", destination)
         span.set_attribute("travel.travellers", travellers)
@@ -109,11 +111,23 @@ def plan():
             errors.append(f"activity-agent: {e}")
 
         try:
+            # Short timeout: currency-agent is deployed as "the second cloud"
+            # in this demo (see manifests/travel-planner/currency-agent.yaml),
+            # so a cross-cloud connectivity failure here should surface
+            # quickly rather than blocking the whole trace for a long time.
+            currency_result = _call_agent("currency-agent", f"{CURRENCY_AGENT_URL}/invoke",
+                {"destination": destination}, timeout=5)
+        except Exception as e:
+            currency_result = "Currency info unavailable"
+            errors.append(f"currency-agent: {e}")
+
+        try:
             itinerary = _call_agent("synthesizer", f"{SYNTHESIZER_URL}/invoke", {
                 "origin": origin, "destination": destination,
                 "departure": departure, "return_date": return_date,
                 "travellers": travellers, "flight_summary": flight_result,
                 "hotel_summary": hotel_result, "activities_summary": activity_result,
+                "currency_summary": currency_result,
             }, timeout=60)
         except Exception as e:
             itinerary = f"Synthesis failed: {e}"
@@ -130,5 +144,7 @@ def plan():
             "departure": departure, "return_date": return_date,
             "travellers": travellers, "flight_summary": flight_result,
             "hotel_summary": hotel_result, "activities_summary": activity_result,
+            "currency_summary": currency_result,
             "itinerary": itinerary,
+            "trace_id": trace_id,
         })

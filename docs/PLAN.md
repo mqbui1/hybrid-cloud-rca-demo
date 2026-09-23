@@ -48,7 +48,24 @@ lab that replicates the same mechanism with synthetic data, decoupled from any s
 
 **Phase 3 — Failure scenario**
 5. Build a failure-injection scenario matching the specific transaction path being demonstrated
-   (e.g. DNS/reverse-lookup issue between on-prem and cloud on a transaction hop).
+   (e.g. DNS/reverse-lookup issue between on-prem and cloud on a transaction hop). **Done** —
+   `scripts/03-inject-dns-failure.sh` / `docs/DEMO_SCRIPT.md`.
+6. **Done** — load-balancer/device failure on the cloud-side hop. Nimesh's own worked example
+   (on-prem → DNS → AWS ALB → back) wasn't just DNS — he explicitly called out that a transaction
+   "can fail on any device... network load balancer, or any devices inside on-prem."
+   `scripts/05-inject-lb-failure.sh` / `docs/DEMO_SCRIPT_LB_FAILURE.md` simulate flight-agent being
+   marked unhealthy by its LB (HTTP 503s), correlated via host+time through the Infrastructure
+   host entity page — verified end to end (SolarWinds "Target Group Unhealthy" alert surfaced
+   correctly scoped, 5/5 events, no unscoped noise).
+7. **True multi-cloud hop failure.** Nimesh's stated #1 concern on the Cisco Cloud Control
+   call: "we have multi-cloud... different data formats and different ways data has been
+   collected. How do you bring all these things together?" Added a second cloud leg:
+   `currency-agent` is deployed and tagged `cloud.provider=azure`/`cloud.region=eastus2` while
+   the orchestrator and every other agent are tagged `aws`/`us-west-2`. `CROSS_CLOUD_UNREACHABLE`
+   env var makes the agent hang instead of erroring, simulating a dropped VPC/VNet peering
+   route. `scripts/06-inject-multicloud-failure.sh` / `docs/DEMO_SCRIPT_MULTICLOUD_FAILURE.md`
+   walk through it, correlated the same host+time way via the Infrastructure host entity page.
+   Built but not yet verified live end-to-end (see README Status).
 
 **Phase 4 — Demo script**
 6. Write the walkthrough: problem framing → transaction journey in APM → inject the failure →

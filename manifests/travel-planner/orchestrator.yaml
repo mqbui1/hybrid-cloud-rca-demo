@@ -45,6 +45,12 @@ spec:
                 secretKeyRef:
                   name: demo-secret
                   key: env
+            # Simulates "cloud A" for the multi-cloud hop scenario — see
+            # currency-agent.yaml, which is tagged as Azure.
+            - name: CLOUD_PROVIDER
+              value: "aws"
+            - name: CLOUD_REGION
+              value: "us-west-2"
             # Agent service URLs
             - name: FLIGHT_AGENT_URL
               value: "http://flight-agent.travel-planner.svc.cluster.local:8080"
@@ -52,6 +58,8 @@ spec:
               value: "http://hotel-agent.travel-planner.svc.cluster.local:8080"
             - name: ACTIVITY_AGENT_URL
               value: "http://activity-agent.travel-planner.svc.cluster.local:8080"
+            - name: CURRENCY_AGENT_URL
+              value: "http://currency-agent.travel-planner.svc.cluster.local:8080"
             - name: SYNTHESIZER_URL
               value: "http://synthesizer.travel-planner.svc.cluster.local:8080"
           resources:

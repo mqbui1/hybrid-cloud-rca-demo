@@ -34,14 +34,22 @@ def setup_otel(service_name: str) -> None:
         TraceContextTextMapPropagator(),
     ]))
 
-    resource = Resource.create(
-        {
-            SERVICE_NAME: os.environ.get("OTEL_SERVICE_NAME", service_name),
-            "deployment.environment": os.environ.get(
-                "DEPLOYMENT_ENVIRONMENT", "hybrid-visibility-demo"
-            ),
-        }
-    )
+    resource_attrs = {
+        SERVICE_NAME: os.environ.get("OTEL_SERVICE_NAME", service_name),
+        "deployment.environment": os.environ.get(
+            "DEPLOYMENT_ENVIRONMENT", "hybrid-visibility-demo"
+        ),
+    }
+    # Optional — lets a service declare which cloud it's simulating running
+    # in (e.g. the multi-cloud scenario tags currency-agent as Azure while
+    # everything else is AWS), since this whole app actually runs in one
+    # k3d cluster with no real cloud metadata to auto-detect.
+    if os.environ.get("CLOUD_PROVIDER"):
+        resource_attrs["cloud.provider"] = os.environ["CLOUD_PROVIDER"]
+    if os.environ.get("CLOUD_REGION"):
+        resource_attrs["cloud.region"] = os.environ["CLOUD_REGION"]
+
+    resource = Resource.create(resource_attrs)
 
     tracer_provider = TracerProvider(resource=resource, sampler=ParentBased(ALWAYS_ON))
     tracer_provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))

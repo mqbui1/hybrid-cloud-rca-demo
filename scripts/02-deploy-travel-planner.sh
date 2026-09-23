@@ -54,12 +54,12 @@ kubectl create secret generic demo-secret \
   --dry-run=client -o yaml | kubectl apply -f -
 
 echo "==> Deploying travel-planner services..."
-for manifest in orchestrator flight-agent hotel-agent activity-agent synthesizer; do
+for manifest in orchestrator flight-agent hotel-agent activity-agent currency-agent synthesizer; do
   kubectl apply -f "${REPO_DIR}/manifests/travel-planner/${manifest}.yaml"
 done
 
 echo "==> Waiting for services to be ready..."
-for svc in orchestrator flight-agent hotel-agent activity-agent synthesizer; do
+for svc in orchestrator flight-agent hotel-agent activity-agent currency-agent synthesizer; do
   kubectl rollout status deployment/${svc} -n travel-planner --timeout=180s
   echo "    ${svc} ready"
 done

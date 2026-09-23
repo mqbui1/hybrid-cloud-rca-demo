@@ -41,6 +41,7 @@ def invoke():
     flight_summary = payload.get("flight_summary", "")
     hotel_summary = payload.get("hotel_summary", "")
     activities_summary = payload.get("activities_summary", "")
+    currency_summary = payload.get("currency_summary", "")
 
     logger.info(
         "synthesizer invoked: %s → %s, %s to %s, %d traveller(s)",
@@ -52,12 +53,14 @@ def invoke():
             f"7-Day {destination} Itinerary for {travellers} travellers\n"
             f"Flights: {flight_summary}\n"
             f"Hotel: {hotel_summary}\n"
-            f"Activities: {activities_summary}"
+            f"Activities: {activities_summary}\n"
+            f"Currency: {currency_summary}"
         )
     else:
         from langchain_core.messages import HumanMessage, SystemMessage
         specialist_data = json.dumps(
-            {"flight": flight_summary, "hotel": hotel_summary, "activities": activities_summary},
+            {"flight": flight_summary, "hotel": hotel_summary, "activities": activities_summary,
+             "currency": currency_summary},
             indent=2,
         )
         logger.info("Calling LLM to synthesize final itinerary")
