@@ -12,19 +12,48 @@
 - Entity-index mapping enabled for **Related Content (logs)** on the index you're using
   (Log Observer → Settings → Entity-Index Mapping for Related Content (logs) → select the LOC
   connection → add mappings for `host.name` and `k8s.node.name` → `hybrid-cloud-rca-demo`).
-- `HEC_URL` / `HEC_TOKEN` for the Splunk Platform stack, to run the synthetic event generator
+- `HEC_URL` / `HEC_TOKEN` for the Splunk Platform stack, to run the synthetic event generator.
+  If `data/inputs/http` on the stack has no tokens yet (fresh stack) or HEC returns
+  `{"text":"Invalid token","code":4}`, see `docs/TROUBLESHOOTING.md` — you likely need to create
+  a HEC token before this scenario will work.
+- A **Global Data Link** on `host.name` so the pivot in Step 3 is a single click instead of a
+  manual navigation (see "One-time setup" below).
 
 > **How this pivot correlates:** APM's trace-view "Related Logs" widget (the one that auto-loads
 > at the bottom of a trace) only keyword-matches on `trace_id` — it can't be used here, since real
 > SolarWinds/ExtraHop tools have no visibility into application trace context and it would be
-> unrealistic to expect a customer to inject one. The trace's "Related Content → Infrastructure"
-> tile is also not usable — confirmed (on a fresh trace, not a sync-delay artifact) to return
-> "No related results" in this org, even though the reverse direction works (an Infrastructure
-> Container entity's Related Content *can* pivot into APM). This walkthrough instead pivots
-> manually: read `host.name`/the pod name directly off the span's own **Process** tags panel in
-> APM, then navigate to **Infrastructure → Host entity page's Related Content**, which correlates
-> by `host.name` + time window — the same dimension real network-monitoring tools already tag
-> their alerts with.
+> unrealistic to expect a customer to inject one. The trace's built-in "Related Content →
+> Infrastructure" tile is also not usable — confirmed (on a fresh trace, not a sync-delay artifact)
+> to return "No related results" in this org, even though the reverse direction works (an
+> Infrastructure Container entity's Related Content *can* pivot into APM). Instead, this
+> walkthrough pivots on `host.name` (the same dimension real network-monitoring tools already tag
+> their alerts with) via a **Global Data Link** — see below — so clicking `host.name` directly in
+> the span's **Process** tags panel jumps straight to that host's Infrastructure entity page and
+> its Related Content.
+
+## One-time setup — Global Data Link (`host.name` → Infrastructure)
+Splunk Observability Cloud's built-in "navigator" data-link target doesn't pass a selection
+filter, so it lands on the unfiltered host list with nothing selected (no Related Content shown).
+A **Custom URL** target with a `mapSelection` query param does select the specific host, so use
+that instead:
+
+1. Get a real URL to copy the fixed parts from: go to **Infrastructure → Hosts**, click any host,
+   and copy the URL — it'll look like
+   `.../#/infra/entity/datacenter%20hosts?colorBy=...&dashboardId=<id>&endTime=now&mapSelection=<that-host>&startTime=-1h&visualization=listSingleMetric`.
+2. **Settings → Data Links → New Data Link**:
+   - **Link label**: `View Host in Infrastructure`
+   - **Link to**: `Custom URL`
+   - **Show on**: `Any value of` → `host.name` (leave **Property value** blank so it's global)
+   - **URL**: the URL from step 1, with the hardcoded host name in `mapSelection=` replaced by the
+     `{{value}}` token (check the form's own "Available properties" panel for the exact token
+     syntax your version supports — use whatever it lists if it differs from `{{value}}`):
+     ```
+     https://app.us1.signalfx.com/#/infra/entity/datacenter%20hosts?colorBy=agent.cpu.utilization&dashboardId=Gm1h4zEAwAI&endTime=now&mapSelection={{value}}&startTime=-1h&visualization=listSingleMetric
+     ```
+     (`dashboardId` is specific to this org — grab your own from step 1 rather than reusing this one.)
+   - Leave **Time format**, **Minimum time window**, and **Property mapping** at their defaults.
+3. Save. Any `host.name` value shown anywhere in the app (including the APM span **Process** tags
+   panel) is now a clickable link straight to that host's Infrastructure entity page.
 
 ## The story
 A transaction has to traverse on-prem infrastructure before reaching a cloud service. Today,
@@ -90,11 +119,15 @@ tagged with the same `host` value as the failing span's `host.name`/`k8s.node.na
 field these two systems can realistically be correlated on.
 
 ## Step 5 — Pivot via Related Content
-Go to **Infrastructure → Hosts → `${CORRELATING_HOST}`** and open **Related Content → Logs**.
-It should show a tile for related log lines on that host, scoped to a time window around now.
-Select it to open Log Observer, filtered to that host/time. The SolarWinds alert and ExtraHop
-detection from Step 4 should appear, naming the on-prem relay node and describing the DNS
-resolution failure directly.
+Click the `host.name` value directly in the failing span's **Process** tags panel (Step 3) — the
+Global Data Link (see Prerequisites) jumps straight to that host's Infrastructure entity page,
+already selected. Open **Related Content → Logs**. It should show a tile for related log lines on
+that host, scoped to a time window around now. Select it to open Log Observer, filtered to that
+host/time. The SolarWinds alert and ExtraHop detection from Step 4 should appear, naming the
+on-prem relay node and describing the DNS resolution failure directly.
+
+(No Global Data Link set up yet? Go to **Infrastructure → Hosts → `${CORRELATING_HOST}`** manually
+instead.)
 
 If the tile doesn't appear, or results look unscoped, check (in order): `CORRELATING_HOST` matches
 the pod's node name exactly, the HEC events landed in the index that has entity-index mapping
