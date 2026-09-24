@@ -16,13 +16,20 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 NAMESPACE="travel-planner"
+
+echo "==> Resetting to a clean baseline (undoing any previously active scenario)..."
+bash "${SCRIPT_DIR}/04-restore-services.sh"
 
 echo "==> Marking flight-agent unhealthy (simulated LB health-check failure)..."
 kubectl set env deployment/flight-agent -n "${NAMESPACE}" LB_UNHEALTHY=true
 
 echo "==> Waiting for flight-agent rollout..."
 kubectl rollout status deployment/flight-agent -n "${NAMESPACE}" --timeout=60s
+
+echo "==> Enabling load generator for the duration of this demo..."
+kubectl patch cronjob travel-planner-loadgen -n "${NAMESPACE}" -p '{"spec":{"suspend":false}}'
 
 echo "==> Firing a test request to generate a failing trace..."
 kubectl run -it --rm lb-failure-test --image=curlimages/curl --restart=Never -n "${NAMESPACE}" -- \
@@ -31,9 +38,17 @@ kubectl run -it --rm lb-failure-test --image=curlimages/curl --restart=Never -n 
     -d '{"origin": "Seattle", "destination": "Paris", "travellers": 2}' \
   || true
 
+HOST=$(kubectl get pod -n "${NAMESPACE}" -l app=flight-agent -o jsonpath='{.items[0].spec.nodeName}')
+cat > /tmp/hybrid-cloud-rca-demo-active-scenario <<EOF
+SCENARIO=lb-failure
+DEVICE=alb-travel-planner-prod
+HOST=${HOST}
+EOF
+
 echo ""
 echo "==> LB failure injected."
 echo "    Expect: agent.call.flight-agent span errors with an HTTP 503"
 echo "    (Service Temporarily Unavailable), while orchestrator health checks"
 echo "    and every other agent stay healthy."
+echo "    Correlating host: ${HOST}"
 echo "    Restore with: bash scripts/04-restore-services.sh"

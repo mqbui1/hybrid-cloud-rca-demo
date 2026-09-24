@@ -18,13 +18,20 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 NAMESPACE="travel-planner"
+
+echo "==> Resetting to a clean baseline (undoing any previously active scenario)..."
+bash "${SCRIPT_DIR}/04-restore-services.sh"
 
 echo "==> Marking currency-agent unreachable (simulated cross-cloud route failure)..."
 kubectl set env deployment/currency-agent -n "${NAMESPACE}" CROSS_CLOUD_UNREACHABLE=true
 
 echo "==> Waiting for currency-agent rollout..."
 kubectl rollout status deployment/currency-agent -n "${NAMESPACE}" --timeout=60s
+
+echo "==> Enabling load generator for the duration of this demo..."
+kubectl patch cronjob travel-planner-loadgen -n "${NAMESPACE}" -p '{"spec":{"suspend":false}}'
 
 echo "==> Firing a test request to generate a failing trace (this will hang ~5s before the orchestrator's timeout fires)..."
 kubectl run -it --rm multicloud-failure-test --image=curlimages/curl --restart=Never -n "${NAMESPACE}" -- \
@@ -33,6 +40,13 @@ kubectl run -it --rm multicloud-failure-test --image=curlimages/curl --restart=N
     -d '{"origin": "Seattle", "destination": "Paris", "travellers": 2}' \
   || true
 
+HOST=$(kubectl get pod -n "${NAMESPACE}" -l app=currency-agent -o jsonpath='{.items[0].spec.nodeName}')
+cat > /tmp/hybrid-cloud-rca-demo-active-scenario <<EOF
+SCENARIO=multicloud-failure
+DEVICE=aws-azure-vnet-peering-01
+HOST=${HOST}
+EOF
+
 echo ""
 echo "==> Multi-cloud failure injected."
 echo "    Expect: agent.call.currency-agent span times out after ~5s (the"
@@ -40,4 +54,5 @@ echo "    orchestrator's per-call timeout), while orchestrator health checks"
 echo "    and every other agent (all tagged cloud.provider=aws) stay healthy."
 echo "    Look at cloud.provider/cloud.region resource attributes on the"
 echo "    currency-agent span vs. every other span to show the cross-cloud hop."
+echo "    Correlating host: ${HOST}"
 echo "    Restore with: bash scripts/04-restore-services.sh"

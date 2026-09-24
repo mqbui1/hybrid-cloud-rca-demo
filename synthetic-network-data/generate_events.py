@@ -106,9 +106,9 @@ def extrahop_heartbeat(host: str, device: str, now: float) -> dict:
     return {
         "id": f"dtn-{random.randint(100000, 999999)}",
         "category": "PERF",
-        "title": "DNS Response Times Nominal",
+        "title": "Metrics Nominal",
         "risk_score": 5,
-        "description": f"DNS response times for {device} within normal range.",
+        "description": f"Metrics for {device} within normal range.",
         "participants": [
             {"role": "offender", "object_type": "device", "hostname": device},
         ],
@@ -200,13 +200,12 @@ SCENARIOS = {
     "baseline": (solarwinds_heartbeat, extrahop_heartbeat, "Information", "onprem-dns-relay-01"),
 }
 
-# Splunk's Logs view "Severity" column reads a lowercase `severity` field with
-# CIM Alerts-model values (critical/high/medium/low/informational) — neither
-# vendor's native field name/casing ("Severity"/"risk_score") matches that, so
-# without this it shows "Unknown". Real deployments normalize onto this via
-# CIM field aliasing (same purpose); we set it directly since there's no CIM
-# alias config in this lab.
-SEVERITY_MAP = {"Critical": "critical", "Information": "informational"}
+# Splunk Observability Cloud's Log Observer "Severity" column reads a
+# lowercase `severity` field, but only recognizes standard log-level strings
+# (critical/error/warning/info/debug, etc.) — not the CIM Alerts-model's
+# "informational". Neither vendor's native field name/casing ("Severity"/
+# "risk_score") matches either, so without this it shows "Unknown".
+SEVERITY_MAP = {"Critical": "critical", "Information": "info"}
 
 
 def main():

@@ -118,6 +118,11 @@ This pushes a SolarWinds-style alert and an ExtraHop-style detection into the Sp
 tagged with the same `host` value as the failing span's `host.name`/`k8s.node.name` — the only
 field these two systems can realistically be correlated on.
 
+(`scripts/03-inject-dns-failure.sh` already detected this host itself and wrote it to
+`/tmp/hybrid-cloud-rca-demo-active-scenario` — if `HEC_URL`/`HEC_TOKEN` are exported when you later
+run `scripts/04-restore-services.sh`, a heartbeat/resolution event is sent automatically so the
+alert/detection doesn't stay "active" forever in Splunk.)
+
 ## Step 5 — Pivot via Related Content
 Click the `host.name` value directly in the failing span's **Process** tags panel (Step 3) — the
 Global Data Link (see Prerequisites) jumps straight to that host's Infrastructure entity page,

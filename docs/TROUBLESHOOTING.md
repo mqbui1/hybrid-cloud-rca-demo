@@ -88,6 +88,21 @@ cluster is named `hybrid-cloud-rca-demo`, so **always set it explicitly**:
 K3D_CLUSTER=hybrid-cloud-rca-demo bash scripts/02-deploy-travel-planner.sh
 ```
 
+## `scripts/04-restore-services.sh` auto-resolution step prints `ModuleNotFoundError: No module named 'requests'`
+**Symptom:** restore still completes ("All services restored." still prints, since the resolution
+call is wrapped in `|| true`), but the auto-resolution step right before it shows this traceback and
+the previous scenario's SolarWinds alert/ExtraHop detection is never resolved.
+
+**Root cause:** the script invokes `${PYTHON3:-python3}`, and on machines where some other tool
+(e.g. a `platformio`/other venv) puts its own `python3` earlier on `$PATH`, that interpreter won't
+have `requests` installed even though your normal `python3`/Homebrew Python does.
+
+**Fix:** export `PYTHON3` to the interpreter that actually has `requests` before running restore
+(or any inject script — they source the same env):
+```bash
+export PYTHON3=/opt/homebrew/bin/python3   # or: which python3, from a shell where `import requests` works
+```
+
 ## `generate_events.py` / HEC exporter fails with `{"text":"Invalid token","code":4}` (403)
 **Symptom:** `synthetic-network-data/generate_events.py` fails with a `403` and
 `{"text":"Invalid token","code":4}`, and/or the OTel Collector agent's logs show the

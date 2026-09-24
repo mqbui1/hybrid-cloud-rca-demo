@@ -24,5 +24,26 @@ for svc in orchestrator flight-agent hotel-agent activity-agent currency-agent s
   echo "    ${svc} restored"
 done
 
+echo "==> Disabling load generator until the next demo..."
+kubectl patch cronjob travel-planner-loadgen -n "${NAMESPACE}" -p '{"spec":{"suspend":true}}'
+kubectl delete jobs -n "${NAMESPACE}" --field-selector=status.successful=1 2>/dev/null || true
+
+STATE_FILE="/tmp/hybrid-cloud-rca-demo-active-scenario"
+if [ -f "${STATE_FILE}" ]; then
+  # shellcheck disable=SC1090
+  source "${STATE_FILE}"
+  if [ -n "${HEC_URL:-}" ] && [ -n "${HEC_TOKEN:-}" ]; then
+    echo "==> Sending resolution/heartbeat event for previous scenario (${SCENARIO})..."
+    "${PYTHON3:-python3}" "${REPO_DIR}/synthetic-network-data/generate_events.py" \
+      --scenario baseline --host "${HOST}" --device "${DEVICE}" || true
+  else
+    echo "==> Skipping network-event resolution (HEC_URL/HEC_TOKEN not set) —"
+    echo "    the previous scenario's SolarWinds alert/ExtraHop detection will"
+    echo "    remain 'active' in Splunk. Set HEC_URL/HEC_TOKEN before restoring"
+    echo "    to auto-resolve it."
+  fi
+  rm -f "${STATE_FILE}"
+fi
+
 echo ""
 echo "==> All services restored."
