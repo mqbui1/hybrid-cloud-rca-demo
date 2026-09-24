@@ -47,6 +47,8 @@ practice — see `docs/DEMO_SCRIPT.md` for why — so the pivot goes through the
 - `docs/DEMO_SCRIPT_LB_FAILURE.md` — step-by-step walkthrough of the load-balancer scenario.
 - `docs/DEMO_SCRIPT_MULTICLOUD_FAILURE.md` — step-by-step walkthrough of the cross-cloud
   connectivity scenario.
+- `docs/TROUBLESHOOTING.md` — deployment lessons learned (Docker resource contention, Helm/webhook
+  race conditions on first install, etc.) so a fresh deploy goes smoothly.
 
 ## Demo scenarios in detail
 
@@ -84,18 +86,19 @@ demonstrates a different failure signature and a different part of the transacti
   hop that lives in a second cloud provider. The scenario drops the network path between them
   (a VPC/VNet peering route going dark), which is a **silent** failure: no DNS error, no clean
   HTTP error, just a hang.
-- **Signature in APM:** `agent.call.currency-agent` times out client-side after the
-  orchestrator's 5s per-call timeout — no HTTP status at all, the request never got a response.
-  `cloud.provider`/`cloud.region` on this span read `azure`/`eastus2` vs. `aws`/`us-west-2` on
-  every other agent span in the same trace.
+- **Signature in APM:** `agent.call.currency-agent` (the orchestrator's client span) times out
+  after the orchestrator's 5s per-call timeout — `ERROR: ReadTimeout`, no HTTP status at all,
+  since the request never got a response. `currency-agent`'s own server span (`POST /invoke`)
+  shows no error — it's healthy the whole time, just sleeping for 30s before returning a normal
+  200, so the *destination* looks completely fine even though the *caller* already gave up. That
+  asymmetry — one side errors, the other side reports nothing wrong — is the point: it's what a
+  silently dropped route looks like from APM alone, and it's why the overall trace duration runs
+  ~30s (bounded by currency-agent's span) even though the user-facing failure resolves at ~5s.
+  `cloud.provider`/`cloud.region` on the currency-agent spans read `azure`/`eastus2` vs.
+  `aws`/`us-west-2` on every other agent span in the same trace.
 - **Correlating telemetry:** SolarWinds "Route Propagation Failure" alert + ExtraHop "Cross-Cloud
   Peering Connection Down" detection, tagged to a simulated VNet/VPC peering connection.
-- **Status:** injection mechanics verified live at the Kubernetes/application layer (orchestrator
-  logs confirm a clean 5s `ReadTimeout` against currency-agent, which logs the simulated dropped
-  route and hangs as designed; `currency_summary` degrades to "Currency info unavailable" exactly
-  like the other agents' failure handling). The Related Content pivot for this specific scenario
-  has not yet been re-confirmed against the live Splunk org (the underlying mechanism is
-  identical to scenarios 1 and 2, which are confirmed).
+- **Status:** verified end-to-end live (Related Content pivot + Severity display confirmed).
 
 ## Customizing for a specific customer/engagement
 This repo is intentionally generic. To adapt it for a real account:
@@ -110,7 +113,6 @@ This repo is intentionally generic. To adapt it for a real account:
 
 ## Status
 App, OTel Collector deploy scripts, all three failure scenarios, and the synthetic event
-generator are built. DNS and load-balancer are verified end-to-end (including Related Content
-pivot and Severity-column display) against a live Splunk Platform + Observability Cloud org
-pair. Cross-cloud (`currency-agent`) is verified live at the Kubernetes/application layer; its
-Related Content pivot still needs a live re-check (see "Demo scenarios in detail" above).
+generator are built. All three scenarios (DNS, load-balancer, cross-cloud) are verified
+end-to-end — including Related Content pivot and Severity-column display — against a live
+Splunk Platform + Observability Cloud org pair.

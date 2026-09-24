@@ -5,6 +5,10 @@ metadata:
   namespace: travel-planner
 spec:
   schedule: "*/2 * * * *"
+  # Suspended by default — only turned on for the duration of an active demo
+  # scenario. See scripts/03/05/06-inject-*-failure.sh (enable) and
+  # scripts/04-restore-services.sh (disable).
+  suspend: true
   concurrencyPolicy: Forbid
   jobTemplate:
     spec:

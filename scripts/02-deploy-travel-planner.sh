@@ -43,15 +43,18 @@ kubectl create secret generic llm-secret \
   --dry-run=client -o yaml | kubectl apply -f -
 
 echo "==> Copying demo-secret to travel-planner namespace..."
-kubectl get secret demo-secret -n default -o yaml \
+if kubectl get secret demo-secret -n default -o yaml 2>/dev/null \
   | sed 's/namespace: default/namespace: travel-planner/' \
-  | kubectl apply -f - 2>/dev/null || true
-
-# If demo-secret doesn't exist (local dev), create a placeholder
-kubectl create secret generic demo-secret \
-  --namespace travel-planner \
-  --from-literal=env="${INSTANCE:-travel-planner-demo}-demo" \
-  --dry-run=client -o yaml | kubectl apply -f -
+  | kubectl apply -f - 2>/dev/null; then
+  echo "    Copied demo-secret from default namespace."
+else
+  # demo-secret doesn't exist in default namespace (local dev) - create a placeholder
+  echo "    No demo-secret found in default namespace; creating a placeholder."
+  kubectl create secret generic demo-secret \
+    --namespace travel-planner \
+    --from-literal=env="${INSTANCE:-travel-planner-demo}-demo" \
+    --dry-run=client -o yaml | kubectl apply -f -
+fi
 
 echo "==> Deploying travel-planner services..."
 for manifest in orchestrator flight-agent hotel-agent activity-agent currency-agent synthesizer; do
