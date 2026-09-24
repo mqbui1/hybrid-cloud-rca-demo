@@ -18,6 +18,15 @@ for manifest in orchestrator flight-agent hotel-agent activity-agent currency-ag
   kubectl apply -f "${REPO_DIR}/manifests/travel-planner/${manifest}.yaml"
 done
 
+# `kubectl apply`'s three-way merge only removes fields it previously tracked
+# via the last-applied-config annotation. The inject scripts add these env
+# vars with `kubectl set env` (bypassing that annotation), so `apply` alone
+# can't strip them back out — unset them explicitly.
+echo "==> Clearing any scenario-injected env vars..."
+kubectl set env deployment/orchestrator -n "${NAMESPACE}" FLIGHT_AGENT_URL- 2>/dev/null || true
+kubectl set env deployment/flight-agent -n "${NAMESPACE}" LB_UNHEALTHY- 2>/dev/null || true
+kubectl set env deployment/currency-agent -n "${NAMESPACE}" CROSS_CLOUD_UNREACHABLE- 2>/dev/null || true
+
 echo "==> Waiting for rollouts..."
 for svc in orchestrator flight-agent hotel-agent activity-agent currency-agent synthesizer; do
   kubectl rollout status deployment/${svc} -n "${NAMESPACE}" --timeout=120s
